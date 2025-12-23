@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>대송 점프킹 - 실시간 랭킹</title>
+    <title>대송 점프킹 - 캐릭터 선택</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700&display=swap');
 
@@ -58,12 +58,12 @@
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             text-align: center; background: rgba(0, 0, 0, 0.95);
-            padding: 30px; border-radius: 15px; border: 3px solid #e94560;
+            padding: 25px; border-radius: 15px; border: 3px solid #e94560;
             pointer-events: auto; display: flex; flex-direction: column;
-            gap: 15px; z-index: 20; width: 80%; max-width: 320px;
+            gap: 15px; z-index: 20; width: 85%; max-width: 340px;
         }
 
-        h1 { margin: 0; color: #e94560; font-family: 'Black Han Sans', sans-serif; font-size: 36px; letter-spacing: -1px; }
+        h1 { margin: 0; color: #e94560; font-family: 'Black Han Sans', sans-serif; font-size: 32px; letter-spacing: -1px; }
         
         input[type="text"] {
             padding: 10px; border-radius: 5px; border: none;
@@ -89,6 +89,23 @@
             padding: 8px 16px; font-size: 14px; border-radius: 8px;
             cursor: pointer; font-weight: bold;
         }
+
+        /* 캐릭터 선택 스타일 */
+        .char-select-container {
+            display: flex; justify-content: center; gap: 10px; margin: 10px 0;
+        }
+        .char-btn {
+            background: #222; border: 2px solid #555; border-radius: 10px;
+            padding: 10px; cursor: pointer; width: 80px; transition: all 0.2s;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+        }
+        .char-btn.selected {
+            border-color: #ffd700; background: #333; transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+        .char-icon { font-size: 30px; }
+        .char-name { font-size: 12px; font-weight: bold; color: #ccc; }
+        .char-desc { font-size: 10px; color: #888; }
 
         /* Leaderboard Modal */
         #leaderboard-modal {
@@ -149,15 +166,34 @@
         <div class="touch-guide">PC: 방향키 / 스페이스바(점프) + 방향키</div>
     </div>
 
-    <!-- 시작 화면 (이름 입력 제거됨) -->
+    <!-- 시작 화면 & 캐릭터 선택 -->
     <div id="message-box" class="modal-box">
         <h1>대송 점프킹</h1>
-        <p>끝없이 올라가세요!<br>실시간 랭킹에 도전하세요.</p>
+        <p style="font-size:14px; color:#ccc; margin-bottom:5px;">캐릭터를 선택하세요</p>
+        
+        <div class="char-select-container">
+            <div class="char-btn selected" onclick="selectChar('king')">
+                <div class="char-icon">👑</div>
+                <div class="char-name">왕</div>
+                <div class="char-desc">밸런스형<br>브레이크O</div>
+            </div>
+            <div class="char-btn" onclick="selectChar('frog')">
+                <div class="char-icon">🐸</div>
+                <div class="char-name">개구리</div>
+                <div class="char-desc">점프력↑<br>매우 미끄러움</div>
+            </div>
+            <div class="char-btn" onclick="selectChar('ninja')">
+                <div class="char-icon">🥷</div>
+                <div class="char-name">닌자</div>
+                <div class="char-desc">이동속도↑<br>벽점프 가능</div>
+            </div>
+        </div>
+
         <button class="primary-btn" id="start-btn">등반 시작</button>
-        <button class="secondary-btn" id="show-rank-btn">🏆 실시간 랭킹</button>
+        <button class="secondary-btn" id="show-rank-btn" style="margin-top:5px;">🏆 실시간 랭킹</button>
     </div>
 
-    <!-- 종료 시 이름 입력 모달 (새로 추가됨) -->
+    <!-- 종료 시 이름 입력 모달 -->
     <div id="name-input-modal" class="modal-box" style="display:none;">
         <h2 style="margin:0; color:#ffd700;">기록 저장</h2>
         <p>명예의 전당에 남길<br>이름을 입력해주세요.</p>
@@ -186,7 +222,7 @@
 
 <script type="module">
     // =========================================================
-    // Firebase Configuration for dsgames-fecef
+    // Firebase Configuration
     // =========================================================
     const firebaseConfig = {
         apiKey: "AIzaSyBtK7NAfw4wDsS4LRacWF78PHT3zls50IQ",
@@ -197,7 +233,6 @@
         appId: "1:723943517090:web:3e8596971cedf46cc460fb",
         measurementId: "G-GNVR6N4LKQ"
     };
-    // =========================================================
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -262,10 +297,43 @@
     let score = 0;
     let highScore = 0;
     
+    // 캐릭터 설정 (밸런스 조정)
+    const CHARACTERS = {
+        king: { 
+            emoji: '👑', name: "왕",
+            jumpMult: 0.22, 
+            walkSpeed: 4, 
+            friction: 0.2, 
+            wallSlide: false
+        },
+        frog: { 
+            emoji: '🐸', name: "개구리",
+            jumpMult: 0.28, 
+            walkSpeed: 2.5, 
+            friction: 0.92, 
+            wallSlide: false
+        },
+        ninja: { 
+            emoji: '🥷', name: "닌자",
+            jumpMult: 0.155, // 점프력 대폭 하향 (벽점프 활용 필수)
+            walkSpeed: 6, 
+            friction: 0.2, 
+            wallSlide: true 
+        }
+    };
+    let selectedCharKey = 'king';
+
+    // 플레이어 객체
     const player = {
         x: 0, y: 0, vx: 0, vy: 0, width: 30, height: 30,
-        emoji: '👑', isGrounded: false, isCharging: false,
-        charge: 0, facing: 1
+        emoji: '👑', isGrounded: false, isCharging: false, isWallSliding: false,
+        charge: 0, facing: 1,
+        // 동적 스탯
+        jumpMult: 0.22,
+        walkSpeed: 4,
+        friction: 0.2,
+        wallSlide: false,
+        touchingWall: 0 // -1: Left, 1: Right, 0: None
     };
     
     let platforms = [];
@@ -273,15 +341,20 @@
     
     // 물리 상수
     const GRAVITY = 0.5;
-    const FRICTION = 0.85;
     const AIR_RESISTANCE = 0.99;
     const BOUNCE = -0.5;
     const MAX_CHARGE = 100;
-    const JUMP_FORCE_MULTIPLIER = 0.22;
     const WALK_ACCEL = 0.8;
-    const MAX_WALK_SPEED = 4;
 
-    // 초기화
+    window.selectChar = function(key) {
+        selectedCharKey = key;
+        document.querySelectorAll('.char-btn').forEach(btn => btn.classList.remove('selected'));
+        const buttons = document.querySelectorAll('.char-btn');
+        if(key === 'king') buttons[0].classList.add('selected');
+        if(key === 'frog') buttons[1].classList.add('selected');
+        if(key === 'ninja') buttons[2].classList.add('selected');
+    };
+
     function resize() {
         const container = document.getElementById('game-container');
         if(!container) return;
@@ -291,17 +364,20 @@
     }
     window.addEventListener('resize', resize);
     
-    // 조작
     window.addEventListener('keydown', (e) => {
-        // 모달창이 떠있으면 키 입력 무시
         if (nameInputModal.style.display === 'flex') return;
 
         if (e.code === 'Space') {
             if (gameState !== 'PLAYING') return;
             keys.Space = true;
-            if (player.isGrounded && !player.isCharging) {
-                player.isCharging = true; player.charge = 0;
-                playSound('charge');
+            // 벽타기 상태에서도 충전 가능 (touchingWall이 있으면)
+            if ((player.isGrounded || player.touchingWall !== 0) && !player.isCharging) {
+                // 닌자만 벽 충전 허용
+                if (player.isGrounded || (player.wallSlide && player.touchingWall !== 0)) {
+                    player.isCharging = true;
+                    player.charge = 0;
+                    playSound('charge');
+                }
             }
         }
         if (e.code === 'ArrowLeft') { keys.ArrowLeft = true; player.facing = -1; }
@@ -315,7 +391,6 @@
         if (e.code === 'ArrowLeft') keys.ArrowLeft = false;
         if (e.code === 'ArrowRight') keys.ArrowRight = false;
     });
-    // 모바일 터치
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault(); 
         if(gameState !== 'PLAYING' || nameInputModal.style.display === 'flex') return;
@@ -325,7 +400,7 @@
         if(tx < width/2) { keys.ArrowLeft = true; keys.ArrowRight = false; player.facing = -1; }
         else { keys.ArrowRight = true; keys.ArrowLeft = false; player.facing = 1; }
         
-        if(player.isGrounded && !player.isCharging) {
+        if((player.isGrounded || (player.wallSlide && player.touchingWall !== 0)) && !player.isCharging) {
             player.isCharging = true; player.charge = 0; keys.Space = true; playSound('charge');
         }
     }, {passive:false});
@@ -335,38 +410,30 @@
         keys.ArrowLeft = false; keys.ArrowRight = false; keys.Space = false;
     });
 
-    // 버튼 이벤트
     startBtn.addEventListener('click', () => {
         messageBox.style.display = 'none';
         saveScoreBtn.style.display = 'block';
         startGame();
     });
 
-    // 종료 버튼 클릭 시 모달 열기
     saveScoreBtn.addEventListener('click', () => {
         nameInputModal.style.display = 'flex';
-        endNameInput.value = ''; // 이름 초기화
+        endNameInput.value = ''; 
         endNameInput.focus();
     });
 
-    // 저장 확인 버튼
     confirmSaveBtn.addEventListener('click', () => {
         const name = endNameInput.value.trim();
-        if(!name) {
-            alert("이름을 입력해주세요!");
-            return;
-        }
+        if(!name) { alert("이름을 입력해주세요!"); return; }
         playerName = name;
         nameInputModal.style.display = 'none';
         saveAndEndGame();
     });
 
-    // 취소 버튼 (게임 계속하기)
     cancelSaveBtn.addEventListener('click', () => {
         nameInputModal.style.display = 'none';
     });
     
-    // 랭킹창 열기
     showRankBtn.addEventListener('click', () => {
         leaderboardModal.style.display = 'flex';
         startRankListener(); 
@@ -374,40 +441,37 @@
     
     closeRankBtn.addEventListener('click', () => {
         leaderboardModal.style.display = 'none';
-        if(rankUnsubscribe) {
-            rankUnsubscribe();
-            rankUnsubscribe = null;
-        }
+        if(rankUnsubscribe) { rankUnsubscribe(); rankUnsubscribe = null; }
     });
 
-    // --------------------------------------------------------
-    // Firebase 데이터 로직
-    // --------------------------------------------------------
     async function saveAndEndGame() {
-        // 이미 모달에서 이름을 받았으므로 바로 저장 진행
         try {
+            const record = {
+                name: playerName,
+                score: highScore,
+                character: CHARACTERS[selectedCharKey].emoji, 
+                updatedAt: isOnline ? serverTimestamp() : Date.now()
+            };
+
             if(isOnline && currentUser) {
                 const userDoc = doc(db, 'jump_king_ranking', currentUser.uid);
-                await setDoc(userDoc, {
-                    name: playerName,
-                    score: highScore,
-                    updatedAt: serverTimestamp()
-                });
+                await setDoc(userDoc, record);
             } else {
-                // 오프라인 저장
                 const localData = JSON.parse(localStorage.getItem('jumpking_rank') || '[]');
                 const idx = localData.findIndex(i => i.name === playerName);
                 if(idx >= 0) {
-                    if(highScore > localData[idx].score) localData[idx].score = highScore;
+                    if(highScore > localData[idx].score) {
+                        localData[idx].score = highScore;
+                        localData[idx].character = record.character;
+                    }
                 } else {
-                    localData.push({name: playerName, score: highScore, updatedAt: Date.now()});
+                    localData.push(record);
                 }
                 localStorage.setItem('jumpking_rank', JSON.stringify(localData));
             }
             
             gameState = 'GAMEOVER';
             showGameOverUI();
-
         } catch(e) {
             console.error(e);
             alert("저장 실패: Firestore 규칙 확인 필요");
@@ -441,9 +505,10 @@
             html = '<div style="text-align:center; padding:20px;">기록이 없습니다. 1등이 되어보세요!</div>';
         } else {
             data.forEach((item, index) => {
+                const charEmoji = item.character || '👑';
                 html += `
                     <div class="rank-item">
-                        <span>${index+1}. ${escapeHtml(item.name)}</span>
+                        <span>${index+1}. ${charEmoji} ${escapeHtml(item.name)}</span>
                         <span>${item.score}m</span>
                     </div>
                 `;
@@ -456,11 +521,14 @@
     function showGameOverUI() {
         saveScoreBtn.style.display = 'none';
         messageBox.style.display = 'flex';
+        document.querySelector('.char-select-container').style.display = 'none';
+        document.querySelector('#message-box p').innerText = "기록이 저장되었습니다.";
+        
         messageBox.innerHTML = `
             <h1>🏁 등반 종료</h1>
             <p style="font-size:20px;">${escapeHtml(playerName)}님<br>
             <strong style="font-size:32px; color:#ffd700;">${highScore}m</strong></p>
-            <p style="color:#aaa; font-size:14px;">기록이 저장되었습니다.</p>
+            <p style="color:#aaa; font-size:14px;">캐릭터: ${CHARACTERS[selectedCharKey].emoji} ${CHARACTERS[selectedCharKey].name}</p>
             <button class="primary-btn" id="restart-btn">다시 도전</button>
             <button class="secondary-btn" id="show-rank-btn-end">🏆 랭킹 보기</button>
         `;
@@ -476,7 +544,6 @@
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // 오디오 및 게임 로직
     let audioCtx;
     function playSound(t) {
         if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -516,6 +583,16 @@
 
     function initGame() {
         if(!width) return;
+        
+        const charData = CHARACTERS[selectedCharKey];
+        player.emoji = charData.emoji;
+        player.jumpMult = charData.jumpMult;
+        player.walkSpeed = charData.walkSpeed;
+        player.friction = charData.friction;
+        player.wallSlide = charData.wallSlide;
+        player.isWallSliding = false;
+        player.touchingWall = 0;
+
         player.x = width/2 - 15; 
         player.y = height-150; 
         player.vx=0; player.vy=0;
@@ -543,10 +620,27 @@
     }
     
     function jump() {
-        player.isCharging=false; player.isGrounded=false;
+        player.isCharging=false; 
+        
         let dx=0; if(keys.ArrowLeft) dx=-1; if(keys.ArrowRight) dx=1;
-        const p = player.charge * JUMP_FORCE_MULTIPLIER;
-        if(dx!==0) { player.vx=dx*p*0.6; player.vy=-p*0.9; } else { player.vx=0; player.vy=-p; }
+        const p = player.charge * player.jumpMult; 
+        
+        // 닌자 벽 점프: 벽에 닿아있고(touchingWall != 0), 닌자 특성(wallSlide)일 때
+        if (player.wallSlide && player.touchingWall !== 0) {
+             if(dx !== 0) {
+                 player.vx = dx * p * 0.7; 
+                 player.vy = -p * 0.9;
+             } else {
+                 player.vx = 0;
+                 player.vy = -p;
+             }
+        } else if (player.isGrounded) {
+            if(dx!==0) { player.vx=dx*p*0.6; player.vy=-p*0.9; } else { player.vx=0; player.vy=-p; }
+        } else {
+             if(dx!==0) { player.vx=dx*p*0.6; player.vy=-p*0.9; } else { player.vx=0; player.vy=-p; }
+        }
+
+        player.isGrounded=false;
         playSound('jump');
     }
 
@@ -555,7 +649,7 @@
         
         // 1. 충전 로직
         if(player.isCharging) {
-            player.vx *= FRICTION;
+            player.vx *= player.friction; 
             if(player.charge < MAX_CHARGE) player.charge+=2;
         } else player.charge=0;
 
@@ -574,26 +668,75 @@
                     moving=true; 
                 }
                 
-                if(Math.abs(player.vx)>MAX_WALK_SPEED) player.vx = Math.sign(player.vx)*MAX_WALK_SPEED;
+                if(Math.abs(player.vx) > player.walkSpeed) {
+                    player.vx = Math.sign(player.vx) * player.walkSpeed;
+                }
 
                 if(!moving) {
-                    player.vx *= 0.2; 
+                    player.vx *= player.friction; 
                     if(Math.abs(player.vx) < 0.1) player.vx = 0;
                 } else {
-                    player.vx *= FRICTION;
+                    player.vx *= 0.85; 
                 }
             } else {
-                player.vx *= FRICTION;
+                player.vx *= player.friction;
             }
         } else {
             player.vx *= AIR_RESISTANCE;
         }
 
-        player.vy += GRAVITY; player.x += player.vx; player.y += player.vy;
+        player.vy += GRAVITY; 
+        
+        // --- 닌자 벽타기 로직 ---
+        if(player.wallSlide && player.touchingWall !== 0 && player.vy > 0) {
+            // 충전 중이거나 키를 누르고 있어도 미끄러짐
+            if (player.isCharging || 
+                (player.touchingWall === -1 && keys.ArrowLeft) || 
+                (player.touchingWall === 1 && keys.ArrowRight)) {
+                player.vy = Math.min(player.vy, 1.5); 
+            }
+        }
 
-        if(player.x<0){player.x=0; player.vx*=BOUNCE; if(Math.abs(player.vx)>1) playSound('bump');}
-        if(player.x+player.width>width){player.x=width-player.width; player.vx*=BOUNCE; if(Math.abs(player.vx)>1) playSound('bump');}
+        player.x += player.vx; 
+        player.y += player.vy;
 
+        // 벽 충돌 및 접촉 감지
+        player.touchingWall = 0; // 초기화
+
+        if(player.x <= 0){ 
+            player.x = 0;
+            player.touchingWall = -1;
+            
+            if(player.wallSlide && !player.isGrounded) {
+                if(keys.ArrowLeft || player.isCharging) {
+                    player.vx = 0;
+                } else {
+                    player.vx *= BOUNCE;
+                    if(Math.abs(player.vx) > 1) playSound('bump');
+                }
+            } else {
+                player.vx *= BOUNCE;
+                if(Math.abs(player.vx) > 1) playSound('bump');
+            }
+        }
+        else if(player.x + player.width >= width){ 
+            player.x = width - player.width;
+            player.touchingWall = 1;
+
+            if(player.wallSlide && !player.isGrounded) {
+                if(keys.ArrowRight || player.isCharging) {
+                    player.vx = 0;
+                } else {
+                    player.vx *= BOUNCE;
+                    if(Math.abs(player.vx) > 1) playSound('bump');
+                }
+            } else {
+                player.vx *= BOUNCE;
+                if(Math.abs(player.vx) > 1) playSound('bump');
+            }
+        }
+
+        // 플랫폼 충돌
         player.isGrounded=false;
         for(let p of platforms) {
             if(player.x < p.x+p.w && player.x+player.width > p.x && player.y < p.y+p.h && player.y+player.height > p.y) {
