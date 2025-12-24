@@ -627,8 +627,10 @@
     function generatePlatforms() {
         platforms = [{x:0, y:height-80, w:width, h:80, type:'ground'}]; 
         let cY = height-200; 
-        for(let i=0; i<300; i++) {
-            const diff = Math.min(1, i/200);
+        // 1300개로 늘려서 10000m까지 커버
+        for(let i=0; i<1300; i++) {
+            // 난이도 곡선 조정 (1000번째까지 서서히 어려워짐)
+            const diff = Math.min(1, i/1000);
             let pW, pH;
             if(Math.random()<0.2) { pW=40+Math.random()*30; pH=15+Math.random()*10; }
             else if(Math.random()<0.3) { pW=60+Math.random()*60; pH=30+Math.random()*40; }
@@ -712,9 +714,9 @@
         
         // --- 닌자 벽타기 로직 ---
         if(player.wallSlide && player.touchingWall !== 0 && player.vy > 0) {
-            // 충전 중이거나 키를 누르고 있어도 미끄러짐
-            // 미끄러지는 물리 효과 적용
-            player.vy = Math.min(player.vy, 1.5); 
+            // [NERF] 미끄러지는 속도 대폭 증가 (1.5 -> 3.5)
+            // 충전 중이거나 키를 누르고 있어도 빠르게 미끄러짐
+            player.vy = Math.min(player.vy, 3.5); 
         }
 
         player.x += player.vx; 
